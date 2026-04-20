@@ -55,3 +55,9 @@ out/
 src/test/java/java/
 /build.gradle
 /disconf/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
