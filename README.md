@@ -31,16 +31,31 @@ src/
 
 ## 核心算法（MVP）
 
-在 `useBrowLogic.ts` 中实现三点定位：
+在 `useBrowLogic.ts` 中实现三点定位，并扩展为左右眉分别建模：
 
-- 眉头 Start：参考内眼角 `Landmark 133` 垂直投影
-- 眉峰 Arch：鼻翼 `Landmark 1` 到瞳孔外缘 `Landmark 469` 射线推算
-- 眉尾 End：鼻翼 `Landmark 1` 到外眼角 `Landmark 33` 射线推算
+- 右眉：
+  - 眉头 Start：内眼角 `Landmark 133` 垂直投影
+  - 眉峰 Arch：鼻翼 `Landmark 1` -> 瞳孔外缘 `Landmark 469` 射线
+  - 眉尾 End：鼻翼 `Landmark 1` -> 外眼角 `Landmark 33` 射线
+- 左眉：
+  - 眉头 Start：内眼角 `Landmark 362` 垂直投影
+  - 眉峰 Arch：鼻翼 `Landmark 1` -> 瞳孔外缘 `Landmark 474` 射线
+  - 眉尾 End：鼻翼 `Landmark 1` -> 外眼角 `Landmark 263` 射线
 
 脸型修正：
 
 - Round：眉峰 y 坐标向上偏移 15%
 - Square：通过抬高贝塞尔控制点，增加约 20% 弧度半径
+
+### 左右镜像矫正（新增）
+
+系统会在双眉独立计算后，基于中轴线（鼻翼 x 坐标）执行镜像矫正：
+
+- 将右眉关键点镜像到左侧，与左眉点求中间目标
+- 以 35% 权重将左右眉向目标位置平滑靠拢（避免过度僵硬）
+- 输出 `symmetryScore`（0-1）表示矫正后的双侧一致性
+
+前端渲染层会分别绘制左右眉曲线，并展示左右关键点坐标与对称度。
 
 ### 自动脸型识别（新增）
 

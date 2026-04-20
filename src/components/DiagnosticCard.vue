@@ -13,6 +13,7 @@ const props = defineProps<{
 }>();
 
 const toText = (value: number) => value.toFixed(3);
+const toPercent = (value: number) => (value * 100).toFixed(1);
 
 const faceShapeLabel: Record<FaceShape, string> = {
   oval: "椭圆脸 (Oval)",
@@ -49,38 +50,80 @@ const faceShapeLabel: Record<FaceShape, string> = {
       <p class="mt-1 text-sm text-slate-300">
         诊断置信度：
         <span class="font-semibold text-emerald-300"
-          >{{ (props.result.confidence * 100).toFixed(1) }}%</span
+          >{{ toPercent(props.result.confidence) }}%</span
+        >
+      </p>
+      <p class="mt-1 text-sm text-slate-300">
+        左右对称度：
+        <span class="font-semibold text-amber-300"
+          >{{ toPercent(props.result.symmetryScore) }}%</span
         >
       </p>
 
-      <div class="mt-4 space-y-2 text-xs text-slate-200">
-        <div class="rounded-md bg-slate-950/70 px-3 py-2">
-          眉头 Start:
-          <span class="font-mono"
-            >({{ toText(props.result.points.start.x) }},
-            {{ toText(props.result.points.start.y) }})</span
-          >
+      <div class="mt-4 grid gap-3 text-xs text-slate-200 sm:grid-cols-2">
+        <div class="space-y-2">
+          <h3 class="text-xs font-semibold tracking-wide text-cyan-200">左眉 Left</h3>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Start:
+            <span class="font-mono"
+              >({{ toText(props.result.points.left.start.x) }},
+              {{ toText(props.result.points.left.start.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Arch:
+            <span class="font-mono"
+              >({{ toText(props.result.points.left.arch.x) }},
+              {{ toText(props.result.points.left.arch.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            End:
+            <span class="font-mono"
+              >({{ toText(props.result.points.left.end.x) }},
+              {{ toText(props.result.points.left.end.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Control:
+            <span class="font-mono"
+              >({{ toText(props.result.points.left.control.x) }},
+              {{ toText(props.result.points.left.control.y) }})</span
+            >
+          </div>
         </div>
-        <div class="rounded-md bg-slate-950/70 px-3 py-2">
-          眉峰 Arch:
-          <span class="font-mono"
-            >({{ toText(props.result.points.arch.x) }},
-            {{ toText(props.result.points.arch.y) }})</span
-          >
-        </div>
-        <div class="rounded-md bg-slate-950/70 px-3 py-2">
-          眉尾 End:
-          <span class="font-mono"
-            >({{ toText(props.result.points.end.x) }},
-            {{ toText(props.result.points.end.y) }})</span
-          >
-        </div>
-        <div class="rounded-md bg-slate-950/70 px-3 py-2">
-          控制点 Control:
-          <span class="font-mono"
-            >({{ toText(props.result.points.control.x) }},
-            {{ toText(props.result.points.control.y) }})</span
-          >
+        <div class="space-y-2">
+          <h3 class="text-xs font-semibold tracking-wide text-emerald-200">
+            右眉 Right
+          </h3>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Start:
+            <span class="font-mono"
+              >({{ toText(props.result.points.right.start.x) }},
+              {{ toText(props.result.points.right.start.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Arch:
+            <span class="font-mono"
+              >({{ toText(props.result.points.right.arch.x) }},
+              {{ toText(props.result.points.right.arch.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            End:
+            <span class="font-mono"
+              >({{ toText(props.result.points.right.end.x) }},
+              {{ toText(props.result.points.right.end.y) }})</span
+            >
+          </div>
+          <div class="rounded-md bg-slate-950/70 px-3 py-2">
+            Control:
+            <span class="font-mono"
+              >({{ toText(props.result.points.right.control.x) }},
+              {{ toText(props.result.points.right.control.y) }})</span
+            >
+          </div>
         </div>
       </div>
 

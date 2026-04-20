@@ -14,9 +14,15 @@ export interface BrowPoints {
   control: LandmarkPoint;
 }
 
+export interface BrowPairPoints {
+  left: BrowPoints;
+  right: BrowPoints;
+}
+
 export interface BrowDiagnosisResult {
-  points: BrowPoints;
+  points: BrowPairPoints;
   confidence: number;
+  symmetryScore: number;
   notes: string[];
 }
 
@@ -74,6 +80,91 @@ const projectRayPoint = (
     x: clamp01(add(origin.x, multiply(dx, scale)) as number),
     y: clamp01(add(origin.y, multiply(dy, scale)) as number),
   };
+};
+
+const lerpPoint = (
+  from: LandmarkPoint,
+  to: LandmarkPoint,
+  t: number,
+): LandmarkPoint => ({
+  x: clamp01(add(from.x, multiply(subtract(to.x, from.x) as number, t)) as number),
+  y: clamp01(add(from.y, multiply(subtract(to.y, from.y) as number, t)) as number),
+});
+
+const mirrorPoint = (point: LandmarkPoint, centerX: number): LandmarkPoint => ({
+  x: clamp01(subtract(multiply(2, centerX) as number, point.x) as number),
+  y: clamp01(point.y),
+});
+
+const computeSingleBrow = (
+  landmarks: LandmarkPoint[],
+  faceShape: FaceShape,
+  imageSize: { width: number; height: number } | undefined,
+  indexMap: { innerEye: number; pupilOuter: number; eyeOuter: number },
+): BrowPoints | null => {
+  const innerEyeRaw = landmarks[indexMap.innerEye];
+  const noseWingRaw = landmarks[1];
+  const pupilOuterRaw = landmarks[indexMap.pupilOuter];
+  const eyeOuterRaw = landmarks[indexMap.eyeOuter];
+  if (!innerEyeRaw || !noseWingRaw || !pupilOuterRaw || !eyeOuterRaw) {
+    return null;
+  }
+
+  const innerEye = normalizePoint(innerEyeRaw, imageSize);
+  const noseWing = normalizePoint(noseWingRaw, imageSize);
+  const pupilOuter = normalizePoint(pupilOuterRaw, imageSize);
+  const eyeOuter = normalizePoint(eyeOuterRaw, imageSize);
+
+  const start: LandmarkPoint = {
+    x: innerEye.x,
+    y: clamp01(innerEye.y - 0.11),
+  };
+
+  const arch = projectRayPoint(noseWing, pupilOuter, 1.08);
+  const end = projectRayPoint(noseWing, eyeOuter, 1.2);
+
+  if (faceShape === "round") {
+    arch.y = clamp01(multiply(arch.y, 0.85) as number);
+  }
+
+  const blended = midpoint(midpoint(start, end), {
+    x: arch.x,
+    y: clamp01(arch.y - 0.04),
+  });
+
+  let control: LandmarkPoint = blended;
+  if (faceShape === "square") {
+    const curveDelta = abs(subtract(blended.y, arch.y)) as number;
+    control = {
+      x: blended.x,
+      y: clamp01(
+        subtract(blended.y, add(multiply(curveDelta, 0.2), 0.02)) as number,
+      ),
+    };
+  }
+
+  return {
+    start,
+    arch,
+    end,
+    control,
+  };
+};
+
+const getSymmetryScore = (
+  left: BrowPoints,
+  right: BrowPoints,
+  centerX: number,
+): number => {
+  const keys: Array<keyof BrowPoints> = ["start", "arch", "end", "control"];
+  const totalDiff = keys.reduce((sum, key) => {
+    const mirroredRight = mirrorPoint(right[key], centerX);
+    const dx = abs(subtract(left[key].x, mirroredRight.x)) as number;
+    const dy = abs(subtract(left[key].y, mirroredRight.y)) as number;
+    return add(sum, add(dx, dy)) as number;
+  }, 0);
+  const averageDiff = divide(totalDiff, keys.length * 2) as number;
+  return clamp01(subtract(1, multiply(averageDiff, 4)) as number);
 };
 
 export const useBrowLogic = () => {
@@ -137,51 +228,48 @@ export const useBrowLogic = () => {
     if (!landmarks || landmarks.length < 470) {
       return null;
     }
-
-    const innerEye = normalizePoint(landmarks[133], imageSize);
-    const noseWing = normalizePoint(landmarks[1], imageSize);
-    const pupilOuter = normalizePoint(landmarks[469], imageSize);
-    const eyeOuter = normalizePoint(landmarks[33], imageSize);
-
-    // Start: vertical projection using inner eye x.
-    const start: LandmarkPoint = {
-      x: innerEye.x,
-      y: clamp01(innerEye.y - 0.11),
-    };
-
-    // Arch: ray from nose wing to outer edge of pupil.
-    const arch = projectRayPoint(noseWing, pupilOuter, 1.08);
-
-    // End: ray from nose wing to outer eye corner.
-    const end = projectRayPoint(noseWing, eyeOuter, 1.2);
-
-    if (faceShape === "round") {
-      // Round face correction: move arch up by 15%.
-      arch.y = clamp01(multiply(arch.y, 0.85) as number);
+    const leftBrow = computeSingleBrow(landmarks, faceShape, imageSize, {
+      innerEye: 362,
+      pupilOuter: 474,
+      eyeOuter: 263,
+    });
+    const rightBrow = computeSingleBrow(landmarks, faceShape, imageSize, {
+      innerEye: 133,
+      pupilOuter: 469,
+      eyeOuter: 33,
+    });
+    const noseWingRaw = landmarks[1];
+    if (!leftBrow || !rightBrow || !noseWingRaw) {
+      return null;
     }
 
-    const blended = midpoint(midpoint(start, end), {
-      x: arch.x,
-      y: clamp01(arch.y - 0.04),
+    // Mirror correction: softly blend brows around face center to reduce asymmetry.
+    const centerX = normalizePoint(noseWingRaw, imageSize).x;
+    const correctionStrength = 0.35;
+    const keys: Array<keyof BrowPoints> = ["start", "arch", "end", "control"];
+    const correctedLeft: BrowPoints = { ...leftBrow };
+    const correctedRight: BrowPoints = { ...rightBrow };
+
+    keys.forEach((key) => {
+      const mirroredRight = mirrorPoint(rightBrow[key], centerX);
+      const targetLeft = midpoint(leftBrow[key], mirroredRight);
+      const targetRight = mirrorPoint(targetLeft, centerX);
+      correctedLeft[key] = lerpPoint(leftBrow[key], targetLeft, correctionStrength);
+      correctedRight[key] = lerpPoint(rightBrow[key], targetRight, correctionStrength);
     });
 
-    let control: LandmarkPoint = blended;
-    if (faceShape === "square") {
-      // Square face correction: increase arc radius by around 20%.
-      const curveDelta = abs(subtract(blended.y, arch.y)) as number;
-      control = {
-        x: blended.x,
-        y: clamp01(
-          subtract(blended.y, add(multiply(curveDelta, 0.2), 0.02)) as number,
-        ),
-      };
-    }
+    const symmetryScore = getSymmetryScore(correctedLeft, correctedRight, centerX);
 
     return {
-      points: { start, arch, end, control },
+      points: {
+        left: correctedLeft,
+        right: correctedRight,
+      },
       confidence: 0.86,
+      symmetryScore,
       notes: [
-        "已根据三点定位法生成眉头、眉峰、眉尾坐标。",
+        "已分别生成左眉与右眉的眉头、眉峰、眉尾坐标。",
+        "已进行镜像矫正以提升双侧眉形一致性。",
         faceShape === "round"
           ? "圆脸建议：提高眉峰可拉长纵向视觉比例。"
           : faceShape === "square"

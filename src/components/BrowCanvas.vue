@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import type { BrowPoints } from "../composites/useBrowLogic";
+import type { BrowPairPoints, BrowPoints } from "../composites/useBrowLogic";
 
 interface Props {
   imageElement: HTMLImageElement;
-  anchors: BrowPoints;
+  anchors: BrowPairPoints;
   width?: number;
   height?: number;
 }
@@ -43,6 +43,35 @@ const drawPoint = (
   drawLabel(ctx, label, x, y);
 };
 
+const drawBrowPath = (
+  ctx: CanvasRenderingContext2D,
+  brow: BrowPoints,
+  toCanvasX: (v: number) => number,
+  toCanvasY: (v: number) => number,
+  strokeStyle: string,
+  labelPrefix: string,
+) => {
+  const startX = toCanvasX(brow.start.x);
+  const startY = toCanvasY(brow.start.y);
+  const archX = toCanvasX(brow.arch.x);
+  const archY = toCanvasY(brow.arch.y);
+  const endX = toCanvasX(brow.end.x);
+  const endY = toCanvasY(brow.end.y);
+  const controlX = toCanvasX(brow.control.x);
+  const controlY = toCanvasY(brow.control.y);
+
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = strokeStyle;
+  ctx.stroke();
+
+  drawPoint(ctx, startX, startY, "#14b8a6", `${labelPrefix}-Start`);
+  drawPoint(ctx, archX, archY, "#f59e0b", `${labelPrefix}-Arch`);
+  drawPoint(ctx, endX, endY, "#f43f5e", `${labelPrefix}-End`);
+};
+
 const drawResult = () => {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -71,30 +100,27 @@ const drawResult = () => {
   // 1. Draw base image layer
   ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
-  const { start, arch, end, control } = props.anchors;
+  const { left, right } = props.anchors;
   const toCanvasX = (v: number) => offsetX + v * drawWidth;
   const toCanvasY = (v: number) => offsetY + v * drawHeight;
 
-  const startX = toCanvasX(start.x);
-  const startY = toCanvasY(start.y);
-  const archX = toCanvasX(arch.x);
-  const archY = toCanvasY(arch.y);
-  const endX = toCanvasX(end.x);
-  const endY = toCanvasY(end.y);
-  const controlX = toCanvasX(control.x);
-  const controlY = toCanvasY(control.y);
-
-  // 2. Draw ideal brow path overlay
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  ctx.quadraticCurveTo(controlX, controlY, endX, endY);
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-  ctx.stroke();
-
-  drawPoint(ctx, startX, startY, "#14b8a6", "Start");
-  drawPoint(ctx, archX, archY, "#f59e0b", "Arch");
-  drawPoint(ctx, endX, endY, "#f43f5e", "End");
+  // 2. Draw left and right ideal brow overlays
+  drawBrowPath(
+    ctx,
+    left,
+    toCanvasX,
+    toCanvasY,
+    "rgba(255, 255, 255, 0.72)",
+    "L",
+  );
+  drawBrowPath(
+    ctx,
+    right,
+    toCanvasX,
+    toCanvasY,
+    "rgba(167, 243, 208, 0.72)",
+    "R",
+  );
 };
 
 onMounted(drawResult);
