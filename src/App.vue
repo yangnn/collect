@@ -9,14 +9,14 @@ import { useDiagnosticStore } from "./stores/useDiagnosticStore";
 
 const store = useDiagnosticStore();
 const { estimateLandmarks } = useFaceMesh();
-const { computeBrowDiagnosis } = useBrowLogic();
+const { estimateFaceShape, computeBrowDiagnosis } = useBrowLogic();
 
 const hasData = computed(() => !!store.rawImage && !!store.diagnosis);
 
 const handleImageSelected = async (payload: {
   file: File;
   url: string;
-  faceShape: FaceShape;
+  faceShape?: FaceShape;
 }) => {
   store.setProcessing(true);
   store.setError(null);
@@ -26,10 +26,11 @@ const handleImageSelected = async (payload: {
     image.src = payload.url;
     await image.decode();
 
+    const manualFaceShape = payload.faceShape;
     store.setImage({
       element: image,
       url: payload.url,
-      faceShape: payload.faceShape,
+      faceShape: manualFaceShape ?? "oval",
     });
 
     const points = await estimateLandmarks(image);
@@ -38,9 +39,26 @@ const handleImageSelected = async (payload: {
       return;
     }
 
-    store.setLandmarks(points);
+    const estimate = estimateFaceShape(points, {
+      width: image.width,
+      height: image.height,
+    });
 
-    const diagnosis = computeBrowDiagnosis(points, payload.faceShape, {
+    let faceShapeMode: "auto" | "manual" | "fallback" = "auto";
+    if (manualFaceShape) {
+      faceShapeMode = "manual";
+    } else if (!estimate) {
+      faceShapeMode = "fallback";
+    }
+
+    const finalFaceShape = manualFaceShape ?? estimate?.faceShape ?? "oval";
+
+    store.setLandmarks(points);
+    store.setFaceShape(finalFaceShape);
+    store.setFaceShapeMode(faceShapeMode);
+    store.setFaceShapeEstimate(estimate);
+
+    const diagnosis = computeBrowDiagnosis(points, finalFaceShape, {
       width: image.width,
       height: image.height,
     });
@@ -103,7 +121,12 @@ const handleImageSelected = async (payload: {
         </div>
       </div>
 
-      <DiagnosticCard :result="store.diagnosis" :face-shape="store.faceShape" />
+      <DiagnosticCard
+        :result="store.diagnosis"
+        :face-shape="store.faceShape"
+        :face-shape-estimate="store.faceShapeEstimate"
+        :face-shape-mode="store.faceShapeMode"
+      />
     </section>
   </main>
 </template>

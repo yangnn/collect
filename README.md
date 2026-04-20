@@ -42,6 +42,25 @@ src/
 - Round：眉峰 y 坐标向上偏移 15%
 - Square：通过抬高贝塞尔控制点，增加约 20% 弧度半径
 
+### 自动脸型识别（新增）
+
+系统在上传后会基于 Face Mesh 关键点自动估计脸型：
+
+- 颧骨宽度：`Landmark 234` 到 `Landmark 454`
+- 面部高度：`Landmark 10` 到 `Landmark 152`
+- 下颌宽度：`Landmark 172` 到 `Landmark 397`
+
+使用宽高比和下颌/颧骨比进行规则分类：
+
+- `widthToHeightRatio` 较高且 `jawToCheekRatio` 较高 -> Square
+- `widthToHeightRatio` 较高且 `jawToCheekRatio` 较低 -> Round
+- 其余默认 -> Oval
+
+上传组件支持两种模式：
+
+- 自动识别脸型（默认）
+- 手动指定脸型（作为覆盖）
+
 ## 运行方式
 
 ```bash

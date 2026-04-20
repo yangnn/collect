@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import type { BrowDiagnosisResult, FaceShape } from "../composites/useBrowLogic";
+import type {
+  BrowDiagnosisResult,
+  FaceShape,
+  FaceShapeEstimate,
+} from "../composites/useBrowLogic";
 
 const props = defineProps<{
   result: BrowDiagnosisResult | null;
   faceShape: FaceShape;
+  faceShapeEstimate: FaceShapeEstimate | null;
+  faceShapeMode: "auto" | "manual" | "fallback" | null;
 }>();
 
 const toText = (value: number) => value.toFixed(3);
@@ -22,6 +28,21 @@ const faceShapeLabel: Record<FaceShape, string> = {
       当前脸型：<span class="font-medium text-cyan-200">{{
         faceShapeLabel[props.faceShape]
       }}</span>
+    </p>
+    <p v-if="props.faceShapeEstimate" class="mt-1 text-xs text-slate-400">
+      {{
+        props.faceShapeMode === "auto"
+          ? "来源：自动识别"
+          : props.faceShapeMode === "manual"
+            ? "来源：手动指定"
+            : "来源：自动失败后回退"
+      }}，置信度：{{ (props.faceShapeEstimate.confidence * 100).toFixed(1) }}%
+      <template v-if="props.faceShapeEstimate.metrics.widthToHeightRatio !== undefined">
+        ，宽高比：{{ props.faceShapeEstimate.metrics.widthToHeightRatio.toFixed(3) }}
+      </template>
+      <template v-if="props.faceShapeEstimate.metrics.jawToCheekRatio !== undefined">
+        ，下颌/颧骨比：{{ props.faceShapeEstimate.metrics.jawToCheekRatio.toFixed(3) }}
+      </template>
     </p>
 
     <template v-if="props.result">

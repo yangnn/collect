@@ -1,4 +1,4 @@
-import { abs, add, divide, multiply, subtract } from "mathjs";
+import { abs, add, divide, multiply, sqrt, subtract } from "mathjs";
 
 export type FaceShape = "oval" | "round" | "square";
 
@@ -18,6 +18,15 @@ export interface BrowDiagnosisResult {
   points: BrowPoints;
   confidence: number;
   notes: string[];
+}
+
+export interface FaceShapeEstimate {
+  faceShape: FaceShape;
+  confidence: number;
+  metrics: {
+    widthToHeightRatio: number;
+    jawToCheekRatio: number;
+  };
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
@@ -48,6 +57,12 @@ const midpoint = (a: LandmarkPoint, b: LandmarkPoint): LandmarkPoint => ({
   y: divide(add(a.y, b.y), 2) as number,
 });
 
+const distance = (a: LandmarkPoint, b: LandmarkPoint): number => {
+  const dx = subtract(a.x, b.x) as number;
+  const dy = subtract(a.y, b.y) as number;
+  return sqrt(add(multiply(dx, dx), multiply(dy, dy)) as number) as number;
+};
+
 const projectRayPoint = (
   origin: LandmarkPoint,
   target: LandmarkPoint,
@@ -62,6 +77,58 @@ const projectRayPoint = (
 };
 
 export const useBrowLogic = () => {
+  const estimateFaceShape = (
+    landmarks: LandmarkPoint[],
+    imageSize?: { width: number; height: number },
+  ): FaceShapeEstimate | null => {
+    if (!landmarks || landmarks.length < 455) {
+      return null;
+    }
+
+    const leftCheek = normalizePoint(landmarks[234], imageSize);
+    const rightCheek = normalizePoint(landmarks[454], imageSize);
+    const forehead = normalizePoint(landmarks[10], imageSize);
+    const chin = normalizePoint(landmarks[152], imageSize);
+    const jawLeft = normalizePoint(landmarks[172], imageSize);
+    const jawRight = normalizePoint(landmarks[397], imageSize);
+
+    const cheekWidth = distance(leftCheek, rightCheek);
+    const faceHeight = distance(forehead, chin);
+    const jawWidth = distance(jawLeft, jawRight);
+
+    if (faceHeight <= 0 || cheekWidth <= 0) {
+      return null;
+    }
+
+    const widthToHeightRatio = divide(cheekWidth, faceHeight) as number;
+    const jawToCheekRatio = divide(jawWidth, cheekWidth) as number;
+
+    let faceShape: FaceShape = "oval";
+    let confidence = 0.75;
+
+    if (widthToHeightRatio >= 0.86) {
+      if (jawToCheekRatio >= 0.84) {
+        faceShape = "square";
+        confidence = 0.82;
+      } else {
+        faceShape = "round";
+        confidence = 0.8;
+      }
+    } else if (jawToCheekRatio >= 0.86 && widthToHeightRatio >= 0.8) {
+      faceShape = "square";
+      confidence = 0.78;
+    }
+
+    return {
+      faceShape,
+      confidence,
+      metrics: {
+        widthToHeightRatio,
+        jawToCheekRatio,
+      },
+    };
+  };
+
   const computeBrowDiagnosis = (
     landmarks: LandmarkPoint[],
     faceShape: FaceShape,
@@ -124,5 +191,5 @@ export const useBrowLogic = () => {
     };
   };
 
-  return { computeBrowDiagnosis };
+  return { estimateFaceShape, computeBrowDiagnosis };
 };

@@ -5,15 +5,17 @@ import type { FaceShape } from "../composites/useBrowLogic";
 interface SelectedPayload {
   file: File;
   url: string;
-  faceShape: FaceShape;
+  faceShape?: FaceShape;
 }
 
 interface Props {
   isProcessing?: boolean;
+  faceShape?: FaceShape;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isProcessing: false,
+  faceShape: "oval",
 });
 
 const emit = defineEmits<{
@@ -22,7 +24,8 @@ const emit = defineEmits<{
 
 const previewUrl = ref("");
 let previousObjectUrl = "";
-const selectedFaceShape = ref<FaceShape>("oval");
+const selectedFaceShape = ref<FaceShape>(props.faceShape);
+const useAutoFaceShape = ref(true);
 
 const releasePrevious = () => {
   if (previousObjectUrl) {
@@ -41,7 +44,11 @@ const onFileChange = (event: Event) => {
   previousObjectUrl = url;
   previewUrl.value = url;
 
-  emit("selected", { file, url, faceShape: selectedFaceShape.value });
+  emit("selected", {
+    file,
+    url,
+    faceShape: useAutoFaceShape.value ? undefined : selectedFaceShape.value,
+  });
 };
 
 onBeforeUnmount(() => {
@@ -70,18 +77,43 @@ onBeforeUnmount(() => {
     </label>
 
     <div class="mt-4">
-      <p class="mb-2 text-sm text-slate-300">选择脸型偏好修正：</p>
+      <p class="mb-2 text-sm text-slate-300">脸型模式：</p>
+      <label
+        class="inline-flex items-center gap-2 rounded-md bg-slate-800 px-3 py-1 text-sm"
+      >
+        <input v-model="useAutoFaceShape" type="checkbox" />
+        自动识别脸型
+      </label>
+    </div>
+
+    <div class="mt-4" :class="{ 'opacity-60': useAutoFaceShape }">
+      <p class="mb-2 text-sm text-slate-300">手动脸型偏好（自动模式下仅作回退）</p>
       <div class="flex flex-wrap gap-2">
         <label class="inline-flex items-center gap-1 rounded-md bg-slate-800 px-3 py-1 text-sm">
-          <input v-model="selectedFaceShape" type="radio" value="oval" />
+          <input
+            v-model="selectedFaceShape"
+            type="radio"
+            value="oval"
+            :disabled="useAutoFaceShape"
+          />
           椭圆脸
         </label>
         <label class="inline-flex items-center gap-1 rounded-md bg-slate-800 px-3 py-1 text-sm">
-          <input v-model="selectedFaceShape" type="radio" value="round" />
+          <input
+            v-model="selectedFaceShape"
+            type="radio"
+            value="round"
+            :disabled="useAutoFaceShape"
+          />
           圆脸
         </label>
         <label class="inline-flex items-center gap-1 rounded-md bg-slate-800 px-3 py-1 text-sm">
-          <input v-model="selectedFaceShape" type="radio" value="square" />
+          <input
+            v-model="selectedFaceShape"
+            type="radio"
+            value="square"
+            :disabled="useAutoFaceShape"
+          />
           方脸
         </label>
       </div>
